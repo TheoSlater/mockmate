@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/utils/supabase";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,6 +10,41 @@ import { Progress } from "@/components/ui/progress";
 import { Brain, Calendar, FlaskConical, Lightbulb, Timer } from "lucide-react";
 
 export default function Home() {
+  const { user } = useAuth();
+  const [daysUntilExam, setDaysUntilExam] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function loadMockDate() {
+      try {
+        if (!user) return;
+
+        const { data, error } = await supabase
+          .from("user_settings")
+          .select("mock_exam_date")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error fetching mock exam date:", error);
+          return;
+        }
+
+        if (data?.mock_exam_date) {
+          const examDate = new Date(data.mock_exam_date);
+          const today = new Date();
+          const diffTime = examDate.getTime() - today.getTime();
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          setDaysUntilExam(diffDays);
+        }
+      } catch (err) {
+        console.error("Error loading mock date:", err);
+      }
+    }
+
+    loadMockDate();
+  }, [user]);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -16,7 +54,7 @@ export default function Home() {
         <div className="grid gap-6 lg:grid-cols-2 mb-8">
           <div className="space-y-4 sm:space-y-6">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold">
-              Hey Theo, here&apos;s your revision outlook
+              Hey {user?.user_metadata.name}, here&apos;s your revision outlook
             </h1>
             <div className="grid gap-4 sm:grid-cols-2">
               <Card>
@@ -27,7 +65,9 @@ export default function Home() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 pt-0">
-                  <p className="text-2xl font-bold">28 days</p>
+                  <p className="text-2xl font-bold">
+                    {daysUntilExam !== null ? `${daysUntilExam} days` : "Not set"}
+                  </p>
                 </CardContent>
               </Card>
               <Card>
