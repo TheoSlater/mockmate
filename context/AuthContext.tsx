@@ -1,4 +1,5 @@
 "use client";
+
 import {
   createContext,
   useContext,
@@ -7,24 +8,36 @@ import {
   ReactNode,
 } from "react";
 import { User } from "@supabase/supabase-js";
-import { supabase } from "../utils/supabase";
+import { supabase } from "@/utils/supabase";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 interface AuthContextProps {
   user: User | null;
   setUser: (user: User | null) => void;
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
     const fetchSession = async () => {
-      const { data } = await supabase.auth.getSession();
-      setUser(data.session?.user ?? null);
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+        setLoading(false);
+      } catch (error) {
+        console.error("Error fetching session:", error);
+        setLoading(false);
+      }
     };
 
     fetchSession();
@@ -33,11 +46,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       async (event, session) => {
         setUser(session?.user ?? null);
 
-        // Only redirect on specific events
-        if (event === "SIGNED_IN" && window.location.pathname === "/login") {
+        if (event === "SIGNED_IN") {
+          toast({
+            title: "Signed in successfully",
+            description: "Welcome back!",
+          });
           router.push("/");
         }
+
         if (event === "SIGNED_OUT") {
+          toast({
+            title: "Signed out",
+            description: "Come back soon!",
+          });
           router.push("/login");
         }
       }
@@ -46,10 +67,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [router]);
+  }, [router, toast]);
 
   return (
-    <AuthContext.Provider value={{ user, setUser }}>
+    <AuthContext.Provider value={{ user, setUser, loading }}>
       {children}
     </AuthContext.Provider>
   );
